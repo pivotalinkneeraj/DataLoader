@@ -1,0 +1,214 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:batch="http://www.springframework.org/schema/batch"
+	xsi:schemaLocation="
+	http://www.springframework.org/schema/beans
+	http://www.springframework.org/schema/beans/spring-beans-3.2.xsd
+	http://www.springframework.org/schema/batch
+	http://www.springframework.org/schema/batch/spring-batch-3.0.xsd
+    http://www.springframework.org/schema/jdbc http://www.springframework.org/schema/jdbc/spring-jdbc-3.0.xsd
+    http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-3.0.xsd
+    http://www.springframework.org/schema/integration/file
+    http://www.springframework.org/schema/integration/file/spring-integration-file.xsd">
+
+
+	<!-- stored job-metadata in database -->
+	<!-- <bean id="jobRepository" class="org.springframework.batch.core.repository.support.JobRepositoryFactoryBean"> 
+		<property name="dataSource" ref="dataSource" /> <property name="transactionManager" 
+		ref="transactionManager" /> <property name="databaseType" value="oracle" 
+		/> </bean> -->
+<!-- 		
+	<bean id="directoryPoller" class="com.medecision.batch.reader.DirectoryPoller">
+    	<property name="filter" ref="compositeFilter" />
+    </bean>	
+
+	<bean id="compositeFilter"
+		class="org.springframework.integration.file.filters.CompositeFileListFilter">
+		<constructor-arg>
+			<list>
+				<bean class="o.s.i.file.filters.AcceptOnceFileListFilter" />
+				<bean class="o.s.i.file.filters.RegexPatternFileListFilter">
+					<constructor-arg value="^test.*$" />
+				</bean>
+			</list>
+		</constructor-arg>
+	</bean> -->
+
+	<!-- stored job-metadata in memory -->
+	<bean id="jobRepository"
+		class="org.springframework.batch.core.repository.support.MapJobRepositoryFactoryBean">
+		<property name="transactionManager" ref="transactionManager" />
+	</bean>
+
+	<bean id="jobLauncher"
+		class="org.springframework.batch.core.launch.support.SimpleJobLauncher">
+		<property name="jobRepository" ref="jobRepository" />
+	</bean>
+
+	<batch:job id="reportJob">
+		<batch:step id="step1">
+			<batch:tasklet>
+				<batch:chunk reader="jsonFileItemReader" processor="jsonProcessor"
+					writer="compositeDatabaseWriter" commit-interval="#{jobParameters['commitInterval']}">
+				</batch:chunk>
+				<batch:listeners>
+					<batch:listener ref="customJobExecutionListener" />
+				</batch:listeners>
+			</batch:tasklet>
+		</batch:step>
+	</batch:job>
+
+	<!-- connect to database -->
+	<bean id="dataSource"
+		class="org.springframework.jdbc.datasource.DriverManagerDataSource">
+		<property name="driverClassName" value="oracle.jdbc.driver.OracleDriver" />
+		<!--property name="url" value="jdbc:oracle:thin:@50.21.182.140:1521:ORCL" 
+			/ -->
+		<property name="url"
+			value="jdbc:oracle:thin:@129.144.154.94:1521:pdb1.a428714.oraclecloud.internal" />
+		<property name="username" value="system" />
+		<property name="password" value="pass_4Temp" />
+	</bean>
+
+	<bean id="transactionManager"
+		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!-- create job-meta tables automatically -->
+	<!-- jdbc:initialize-database data-source="dataSource"> <jdbc:script location="org/springframework/batch/core/schema-drop-mysql.sql" 
+		/> <jdbc:script location="org/springframework/batch/core/schema-mysql.sql" 
+		/> </jdbc:initialize-database -->
+
+	<bean id="jsonFileItemReader" class="com.medecision.batch.reader.JsonFlatFileItemReader"
+		scope="step">
+		<!--bean id="jsonFileItemReader" class="org.springframework.batch.item.file.FlatFileItemReader" -->
+
+		<!-- Read a json file -->
+		<!--property name="resource" value="file:///Users/neerajtiwari/Documents/Technical/JavaWorkspace/SpringBatch2/src/main/resources/instClaimData_4695005195911973466.json.txt" 
+			/ -->
+		<property name="resource"
+			value="file://#{jobParameters['filePath']}/#{jobParameters['fileName']}" />
+		<!-- property name="resource" value="classpath:#{jobParameters['fileName']}" 
+			/ -->
+
+
+		<property name="lineMapper">
+			<bean
+				class="org.springframework.batch.item.file.mapping.PassThroughLineMapper" />
+			<!--bean class="org.springframework.batch.item.file.mapping.JsonLineMapper"/ -->
+			<!-- <property name="lineTokenizer"> <bean class="org.springframework.batch.item.file.transform.DelimitedLineTokenizer"/> 
+				</property> <property name="fieldSetMapper"> <bean class="org.springframework.batch.item.file.mapping.PassThroughFieldSetMapper"/> 
+				</property> -->
+		</property>
+
+		<property name="recordSeparatorPolicy">
+			<bean
+				class="org.springframework.batch.item.file.separator.SimpleRecordSeparatorPolicy" />
+		</property>
+
+	</bean>
+
+	<bean id="fileWriter" class="org.springframework.batch.item.file.FlatFileItemWriter"
+		scope="step">
+		<!--property name="resource" value="classpath:spring-processed-med-data-small.txt" 
+			/ -->
+		<property name="resource"
+			value="file:///Users/neerajtiwari/Documents/Technical/JavaWorkspace/SpringBatch2/src/main/resources/spring-processed-med-data-small.txt" />
+		<property name="lineAggregator">
+			<bean
+				class="org.springframework.batch.item.file.transform.PassThroughLineAggregator" />
+		</property>
+	</bean>
+
+	<bean
+		class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer" />
+
+	<bean id="jsonProcessor" class="com.medecision.batch.processor.ClaimProcessor"
+		scope="step">
+	</bean>
+
+	<bean id="dataUpdater" class="com.medecision.batch.writer.DataUpdater"
+		scope="step">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<bean id="compositeDatabaseWriter"
+		class="org.springframework.batch.item.support.CompositeItemWriter"
+		scope="step">
+		<property name="delegates">
+			<list>
+				<ref bean="oracleDatabaseInsert" />
+				<ref bean="oracleDatabaseUpdate1" />
+				<ref bean="oracleDatabaseUpdate2" />
+			</list>
+		</property>
+	</bean>
+	<bean id="oracleDatabaseInsert" class="com.medecision.batch.writer.DatabaseWriter"
+		scope="step">
+		<property name="dataSource" ref="dataSource" />
+		<property name="fileType" value="#{jobParameters['fileType']}" />
+		<property name="sqlMap">
+			<map>
+				<entry key="claim"
+					value="insert into JSON_CLAIM (json_doc) values (:json_doc)" />
+				<entry key="member"
+					value="insert into JSON_MEMBER (json_doc) values (:json_doc)" />
+				<entry key="provider"
+					value="insert into JSON_PROVIDER (json_doc) values (:json_doc)" />
+			</map>
+		</property>
+		<property name="sql" value="blank" />
+		<property name="itemSqlParameterSourceProvider">
+			<bean
+				class="org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider" />
+		</property>
+	</bean>
+	<bean id="oracleDatabaseUpdate1" class="com.medecision.batch.writer.DatabaseWriter"
+		scope="step">
+		<property name="dataSource" ref="dataSource" />
+		<property name="fileType" value="#{jobParameters['fileType']}" />
+		<property name="sqlMap">
+			<map>
+				<entry key="claim"
+					value="update json_claim jc set jc.is_latest='false' where jc.json_doc.claimNumber=:claimNumber and jc.json_doc.baseKey=:baseKey" />
+				<entry key="member" value="update JSON_MEMBER set json_doc='' where id=-1 " />
+				<entry key="provider" value="update JSON_PROVIDER set json_doc='' where id=-1" />
+			</map>
+		</property>
+		<property name="sql" value="blank" />
+		<property name="itemSqlParameterSourceProvider">
+			<bean
+				class="org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider" />
+		</property>
+	</bean>
+	<bean id="oracleDatabaseUpdate2" class="com.medecision.batch.writer.DatabaseWriter"
+		scope="step">
+		<property name="dataSource" ref="dataSource" />
+		<property name="fileType" value="#{jobParameters['fileType']}" />
+		<property name="sqlMap">
+			<map>
+				<entry key="claim"
+					value="update json_claim jc set jc.is_latest='true' where jc.json_doc.claimNumber=:claimNumber and jc.json_doc.baseKey=:baseKey and jc.json_doc.claimLineNumber=(select max(jc1.json_doc.claimLineNumber) from json_claim jc1 where jc1.json_doc.claimNumber=:claimNumber and jc1.json_doc.baseKey=:baseKey)" />
+				<entry key="member" value="update JSON_MEMBER set json_doc='' where id=-1" />
+				<entry key="provider" value="update JSON_PROVIDER set json_doc='' where id=-1" />
+			</map>
+		</property>
+		<property name="sql" value="blank" />
+		<property name="itemSqlParameterSourceProvider">
+			<bean
+				class="org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider" />
+		</property>
+	</bean>
+
+	<bean id="customJobExecutionListener"
+		class="com.medecision.batch.execution.CustomJobExecutionListener" />
+
+	<!-- <bean id="directoryScanner" class="org.springframework.integration.file.FileReadingMessageSource"> 
+		<property name="directory" value="file:///Users/neerajtiwari/Documents/Technical/JavaWorkspace/SpringBatch2/src/main/resources/" 
+		/> <property name="useWatchService" value="true" /> <property name="watchEvents" 
+		value="CREATE" /> <property name="scanEachPoll" value="true" /> </bean> <int:poller 
+		cron="" default="false" error-channel="" fixed-delay="" fixed-rate="2000" 
+		id="" max-messages-per-poll="1" receive-timeout="" ref="" task-executor="" 
+		time-unit="MILLISECONDS" trigger=""> <int:advice-chain /> <int:transactional 
+		/> </int:poller> -->
+</beans>
