@@ -28,7 +28,7 @@ public class GenericData {
 			this.baseKey=(String)json_map.get("baseKey");
 		}
 		if(json_map.get("claimLineNumber")!=null){
-			this.claimLineNumber=(String)json_map.get("claimLineNumber");
+			this.claimLineNumber=(String)json_map.get("claimLineNumber").toString();
 		}
 	}
 
@@ -79,7 +79,7 @@ public class GenericData {
 	public Map<String, Object> extractAsJson(String input){
 		Map<String, Object> json_map_temp = null;
 		try {
-			json_map_temp = new ObjectMapper().readValue(input, new TypeReference<Map<String, String>>(){});
+			json_map_temp = new ObjectMapper().readValue(input, new TypeReference<Map<String, Object>>(){});
 		} catch (IOException e) {
 			log.error("Exception",e);
 		}
