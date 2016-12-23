@@ -138,23 +138,30 @@
 		<property name="delegates">
 			<list>
 				<ref bean="oracleDatabaseInsert" />
-				<ref bean="oracleDatabaseUpdate1" />
-				<ref bean="oracleDatabaseUpdate2" />
+				<!-- <ref bean="oracleDatabaseUpdate1" />
+				<ref bean="oracleDatabaseUpdate2" /> -->
 			</list>
 		</property>
 	</bean>
+
 	<bean id="oracleDatabaseInsert" class="com.medecision.batch.writer.DatabaseWriter"
 		scope="step">
 		<property name="dataSource" ref="dataSource" />
 		<property name="fileType" value="#{jobParameters['fileType']}" />
 		<property name="sqlMap">
 			<map>
-				<entry key="claim"
-					value="insert into JSON_CLAIM (json_doc) values (:json_doc)" />
-				<entry key="member"
-					value="insert into JSON_MEMBER (json_doc) values (:json_doc)" />
-				<entry key="provider"
-					value="insert into JSON_PROVIDER (json_doc) values (:json_doc)" />
+				<entry key="claim" value="insert into JSON_CLAIM (json_doc) values (:json_doc)" />
+				<entry key="member" value="insert into JSON_MEMBER (json_doc) values (:json_doc)" />
+				<entry key="provider" value="insert into JSON_PROVIDER (json_doc) values (:json_doc)" />
+				
+				<entry key="request" value="insert into json_request (json_doc) values (:json_doc)" />
+				<entry key="memprovattri" value="insert into json_memprovattri (json_doc) values (:json_doc)" />
+				<entry key="clinicalindicator" value="insert into json_clinicalindicator (json_doc) values (:json_doc)" />
+				<entry key="episodeclaims" value="insert into JSON_episodeclaims (json_doc) values (:json_doc)" />
+				<entry key="megepisode" value="insert into JSON_megepisode (json_doc) values (:json_doc)" />
+				<entry key="professionalclaims" value="insert into JSON_professionalclaims (json_doc) values (:json_doc)" />
+				<entry key="rxclaim" value="insert into JSON_rxclaim (json_doc) values (:json_doc)" />
+			
 			</map>
 		</property>
 		<property name="sql" value="blank" />

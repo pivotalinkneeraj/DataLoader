@@ -20,9 +20,16 @@ public class GenericData {
 	
 	public GenericData(String json_doc){
 		setJson_doc(json_doc);
-		this.claimNumber=(String)json_map.get("claimNumber");
-		this.baseKey=(String)json_map.get("baseKey");
-		this.claimLineNumber=(String)json_map.get("claimLineNumber");
+		log.info("json_doc is:"+json_doc);
+		if(json_map.get("claimNumber")!=null){
+			this.claimNumber=(String)json_map.get("claimNumber");
+		}
+		if(json_map.get("baseKey")!=null){
+			this.baseKey=(String)json_map.get("baseKey");
+		}
+		if(json_map.get("claimLineNumber")!=null){
+			this.claimLineNumber=(String)json_map.get("claimLineNumber");
+		}
 	}
 
 	public GenericData() {
