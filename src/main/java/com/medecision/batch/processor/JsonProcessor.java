@@ -34,7 +34,7 @@ public class JsonProcessor implements ItemProcessor<Object, Object>{
 		    String key = entry.getKey();
 		    Object value = entry.getValue();
 		    outboundItems.put(key, value);
-		    genericData.setJson_doc((String)value);
+		    genericData.setJsonDocument((String)value);
 		}
 		log.info("Command line param:"+commandLineParam);
 		return genericData;

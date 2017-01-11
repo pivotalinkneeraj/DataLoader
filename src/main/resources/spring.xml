@@ -47,7 +47,7 @@
 	<batch:job id="reportJob">
 		<batch:step id="step1">
 			<batch:tasklet>
-				<batch:chunk reader="jsonFileItemReader" processor="jsonProcessor"
+				<batch:chunk reader="jsonFileItemReader" processor="compositeItemProcessor"
 					writer="compositeDatabaseWriter" commit-interval="#{jobParameters['commitInterval']}">
 				</batch:chunk>
 				<batch:listeners>
@@ -65,10 +65,16 @@
 			/ -->
 		<property name="url"
 			value="jdbc:oracle:thin:@129.144.154.94:1521:pdb1.a428714.oraclecloud.internal" />
-		<property name="username" value="system" />
-		<property name="password" value="pass_4Temp" />
+		<!-- <property name="username" value="system" />
+		<property name="password" value="pass_4Temp" /> -->
+		<property name="username" value="med_json" />
+		<property name="password" value="med_json" />
 	</bean>
-
+	
+	<bean id="namedParameterJdbcTemplate" class="org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate">
+		<constructor-arg ref="dataSource"/>
+	</bean>
+	
 	<bean id="transactionManager"
 		class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
 		<property name="dataSource" ref="dataSource" />
@@ -105,7 +111,7 @@
 			<bean
 				class="org.springframework.batch.item.file.separator.SimpleRecordSeparatorPolicy" />
 		</property>
-
+		<property name="linesToSkip" value="0" />
 	</bean>
 
 	<bean id="fileWriter" class="org.springframework.batch.item.file.FlatFileItemWriter"
@@ -137,12 +143,54 @@
 		scope="step">
 		<property name="delegates">
 			<list>
+				<!--ref bean="oracleDatabaseMemberValidator" /-->
+				<!--ref bean="oracleDatabaseProviderValidator" /-->
 				<ref bean="oracleDatabaseInsert" />
-				<!-- <ref bean="oracleDatabaseUpdate1" />
-				<ref bean="oracleDatabaseUpdate2" /> -->
+				<ref bean="oracleDatabaseUpdate1" />
+				<ref bean="oracleDatabaseUpdate2" />
 			</list>
 		</property>
 	</bean>
+	<bean id="compositeItemProcessor"
+      class="org.springframework.batch.item.support.CompositeItemProcessor">
+    	<property name="delegates">
+        <list>
+            <ref bean="jsonProcessor" />
+            <ref bean="oracleDatabaseMemberValidator" />
+        </list>
+    </property>
+</bean>
+	<bean id="oracleDatabaseMemberValidator" class="com.medecision.batch.writer.DatabaseMemberValidator" scope="step">
+		<property name="namedParameterJdbcTemplate" ref="namedParameterJdbcTemplate" />
+		<property name="fileType" value="#{jobParameters['fileType']}" />
+		<property name="sqlMap">
+			<map>
+				<entry key="PJ_instclaims" value="select count(*) from hyb_members where memberId=:memberId" />
+				<entry key="JSON_instclaimsS" value="select count(*) from hyb_members where memberId=:memberId" />			
+				<entry key="HYB_instclaims" value="select count(*) from hyb_members where memberId=:memberId" />				
+				<entry key="REL_instclaims" value="select count(*) from hyb_members where memberId=:memberId" />
+			</map>
+		</property>
+		<property name="sql" value="select sysdate from dual where 1=:one" />
+	</bean>
+
+	<bean id="oracleDatabaseProviderValidator" class="com.medecision.batch.writer.DatabaseProviderValidator" scope="step">
+		<property name="namedParameterJdbcTemplate" ref="namedParameterJdbcTemplate" />
+		<property name="fileType" value="#{jobParameters['fileType']}" />
+		<property name="sqlMap">
+			<map>
+				<entry key="PJ_instclaims" value="select count(*) from hyb_providers where memberId=:memberId" />
+				<entry key="JSON_instclaims" value="select count(*) from hyb_providers where memberId=:memberId" />			
+				<entry key="HYB_instclaims" value="select count(*) from hyb_providers where memberId=:memberId" />				
+			</map>
+		</property>
+		<property name="sql" value="blank" />
+		<property name="itemSqlParameterSourceProvider">
+			<bean
+				class="org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider" />
+		</property>
+	</bean>
+	
 
 	<bean id="oracleDatabaseInsert" class="com.medecision.batch.writer.DatabaseWriter"
 		scope="step">
@@ -150,18 +198,64 @@
 		<property name="fileType" value="#{jobParameters['fileType']}" />
 		<property name="sqlMap">
 			<map>
-				<entry key="claim" value="insert into JSON_CLAIM (json_doc) values (:json_doc)" />
-				<entry key="member" value="insert into JSON_MEMBER (json_doc) values (:json_doc)" />
-				<entry key="provider" value="insert into JSON_PROVIDER (json_doc) values (:json_doc)" />
+				<entry key="JSON_instclaims" value="insert into JSON_INSTCLAIMS (json_document) values (:jsonDocument)" />
+				<entry key="JSON_members" value="insert into JSON_MEMBERS (json_document) values (:jsonDocument)" />
+				<entry key="JSON_providers" value="insert into JSON_PROVIDERS (json_document) values (:jsonDocument)" />	
+				<entry key="JSON_request" value="insert into json_request (json_document) values (:jsonDocument)" />
+				<entry key="JSON_memprovattri" value="insert into json_memprovattri (json_document) values (:jsonDocument)" />
+				<entry key="JSON_clinicalindicator" value="insert into json_clinicalindicator (json_document) values (:jsonDocument)" />
+				<entry key="JSON_episodeclaims" value="insert into JSON_episodeclaims (json_document) values (:jsonDocument)" />
+				<entry key="JSON_megepisode" value="insert into JSON_megepisode (json_document) values (:jsonDocument)" />
+				<entry key="JSON_professionalclaims" value="insert into JSON_professionalclaims (json_document) values (:jsonDocument)" />
+				<entry key="JSON_rxclaims" value="insert into JSON_rxclaims (json_document) values (:jsonDocument)" />
 				
-				<entry key="request" value="insert into json_request (json_doc) values (:json_doc)" />
-				<entry key="memprovattri" value="insert into json_memprovattri (json_doc) values (:json_doc)" />
-				<entry key="clinicalindicator" value="insert into json_clinicalindicator (json_doc) values (:json_doc)" />
-				<entry key="episodeclaims" value="insert into JSON_episodeclaims (json_doc) values (:json_doc)" />
-				<entry key="megepisode" value="insert into JSON_megepisode (json_doc) values (:json_doc)" />
-				<entry key="professionalclaims" value="insert into JSON_professionalclaims (json_doc) values (:json_doc)" />
-				<entry key="rxclaim" value="insert into JSON_rxclaim (json_doc) values (:json_doc)" />
+				<entry key="HYB_instclaims" value="insert into HYB_INSTCLAIMS (&quot;_ID&quot;,baseKey, sourceidentifier, status, memberid, subscriberid, membershipId, json_document, islatest, claimNumber, claimLineNumber) values (:id, :baseKey, :sourceIdentifier, :status, :memberId, :subscriberId, :membershipId, :jsonDocument, :isLatest, :claimNumber, :claimLineNumber)" />
+				<entry key="HYB_members" value="insert into HYB_MEMBERS (&quot;_ID&quot;,baseKey, sourceidentifier, status, memberid, subscriberid, membershipId, json_document, islatest) values (:id, :baseKey, :sourceIdentifier, :status, :memberId, :subscriberId, :membershipId, :jsonDocument, :isLatest)" />
+				<entry key="HYB_providers" value="insert into HYB_PROVIDERS (&quot;_ID&quot;,baseKey, sourceidentifier, status, providerId, specialities, json_document, islatest) values (:id, :baseKey, :sourceIdentifier, :status, :providerId, :specialities, :jsonDocument, :isLatest)" />
+				<entry key="HYB_request" value="insert into HYB_request (&quot;_ID&quot;,json_document,  memberid, overallstatusdescription) values (:id, :jsonDocument, :memberId, :overallRequestStatusDescription)" />
+				<entry key="HYB_memprovattri" value="insert into HYB_memprovattri (&quot;_ID&quot;,json_document, memberid, attributedproviderid) values (:id, :jsonDocument, :memberId, :attributedProviderId)" />
+				<entry key="HYB_clinicalindicator" value="insert into HYB_clinicalindicator (&quot;_ID&quot;,json_document, memberId) values (:id,:jsonDocument, :memberId)" />
+				<entry key="HYB_episodeclaims" value="insert into HYB_episodeclaims (&quot;_ID&quot;,json_document, memberId) values (:id,:jsonDocument, :memberId)" />
+				<entry key="HYB_megepisode" value="insert into HYB_megepisode (&quot;_ID&quot;,json_document, memberid) values (:id, :jsonDocument, :memberId)" />
+				<entry key="HYB_professionalclaims" value="insert into HYB_professionalclaims (&quot;_ID&quot;,baseKey, sourceidentifier, status, memberid, subscriberid, membershipId, json_document, startOfServiceDate) values (:id, :baseKey, :sourceIdentifier, :status, :memberId, :subscriberId, :membershipId, :jsonDocument, :startOfServiceDate)" />
+				<entry key="HYB_rxclaims" value="insert into HYB_rxclaims (&quot;_ID&quot;,basekey, claimnumber,  sourceidentifier, status, json_document, islatest, memberId) values (:id, :baseKey, :claimNumber,  :sourceIdentifier, :status, :jsonDocument, :isLatest, :memberId)" />
 			
+				<entry key="PJ_instclaims" value="insert into PJ_INSTCLAIMS (json_document) values (:jsonDocument)" />
+				<entry key="PJ_members" value="insert into PJ_MEMBERS (json_document) values (:jsonDocument)" />
+				<entry key="PJ_providers" value="insert into PJ_PROVIDERS (json_document) values (:jsonDocument)" />
+				<entry key="PJ_request" value="insert into PJ_request (json_document) values (:jsonDocument)" />
+				<entry key="PJ_memprovattri" value="insert into PJ_memprovattri (json_document) values (:jsonDocument)" />
+				<entry key="PJ_clinicalindicator" value="insert into PJ_clinicalindicator (json_document) values (:jsonDocument)" />
+				<entry key="PJ_episodeclaims" value="insert into PJ_episodeclaims (json_document) values (:jsonDocument)" />
+				<entry key="PJ_megepisode" value="insert into PJ_megepisode (json_document) values (:jsonDocument)" />
+				<entry key="PJ_professionalclaims" value="insert into PJ_professionalclaims (json_document) values (:jsonDocument)" />
+				<entry key="PJ_rxclaims" value="insert into PJ_rxclaims (json_document) values (:jsonDocument)" />
+			
+				<entry key="REL_instclaims" value="insert into REL_instclaims(
+							&quot;_id&quot;,&quot;baseKey&quot;,&quot;sourceIdentifier&quot;,&quot;status&quot;,&quot;memberId&quot;,&quot;subscriberId&quot;,&quot;membershipId&quot;,&quot;isLatest&quot;,&quot;claimNumber&quot;,&quot;claimLineNumber&quot;,
+							&quot;admittingDxTypeCode&quot;,&quot;allowedAmountClaimLevel&quot;,&quot;allowedAmountLineLevel&quot;,&quot;claimAdjustmentTypeCode&quot;,&quot;claimLineProcedureCode&quot;,&quot;claimReceivedDate&quot;, 
+							&quot;claimServicingProviderId&quot;,&quot;claimStatus&quot;,&quot;clientId&quot;,&quot;dischargeCode&quot;,&quot;divisionId&quot;,&quot;dxCode0&quot;,&quot;dxCode1&quot;,&quot;dxCode10&quot;,&quot;dxCode11&quot;,&quot;dxCode2&quot;,&quot;dxCode3&quot;,&quot;dxCode4&quot;,
+							&quot;dxCode5&quot;,&quot;dxCode6&quot;,&quot;dxCode7&quot;,&quot;dxCode8&quot;,&quot;dxCode9&quot;,&quot;dxCodeType0&quot;,&quot;dxCodeType1&quot;,&quot;dxCodeType10&quot;,&quot;dxCodeType11&quot;,&quot;dxCodeType2&quot;,&quot;dxCodeType3&quot;,&quot;dxCodeType4&quot;,
+							&quot;dxCodeType5&quot;,&quot;dxCodeType6&quot;,&quot;dxCodeType7&quot;,&quot;dxCodeType8&quot;,&quot;dxCodeType9&quot;,&quot;dxRelatedGroup&quot;,&quot;healthPlanCode&quot;,&quot;organizationId&quot;,
+							&quot;placeOfService&quot;,&quot;placeOfServiceDesc&quot;,&quot;principalDx&quot;,&quot;principalDxTypeCode&quot;,&quot;principalProcedureCode&quot;,&quot;principalProcedureCodeType&quot;,&quot;procedureCode0&quot;,&quot;procedureCode1&quot;,
+							&quot;procedureCode10&quot;,&quot;procedureCode11&quot;,&quot;procedureCode2&quot;,&quot;procedureCode3&quot;,&quot;procedureCode4&quot;,&quot;procedureCode5&quot;,&quot;procedureCode6&quot;,&quot;procedureCode7&quot;,&quot;procedureCode8&quot;,
+							&quot;procedureCode9&quot;,&quot;procedureCodeType0&quot;,&quot;procedureCodeType1&quot;,&quot;procedureCodeType10&quot;,&quot;procedureCodeType11&quot;,&quot;procedureCodeType2&quot;,&quot;procedureCodeType3&quot;,&quot;procedureCodeType4&quot;,
+							&quot;procedureCodeType5&quot;,&quot;procedureCodeType6&quot;,&quot;procedureCodeType7&quot;,&quot;procedureCodeType8&quot;,&quot;procedureCodeType9&quot;,&quot;procedureOneCodeModifier1&quot;,&quot;procedureOneCodeModifier2&quot;,
+							&quot;procedureOneCodeModifier3&quot;,&quot;procedureOneCodeModifier4&quot;,&quot;processDate&quot;,&quot;revenueCode&quot;,&quot;serviceUnits&quot;,&quot;servicingProviderId&quot;,&quot;startOfServiceDate&quot;,
+							&quot;endOfServiceDate&quot;,&quot;subClientId&quot;,&quot;subscriberDateOfBirth&quot;,&quot;subscriberFirstName&quot;,&quot;subscriberGender&quot;)
+							values(
+							:id,:baseKey, :sourceIdentifier, :status, :memberId, :subscriberId, :membershipId, :isLatest, :claimNumber, :claimLineNumber,
+							:admittingDxTypeCode,:allowedAmountClaimLevel,:allowedAmountLineLevel,:claimAdjustmentTypeCode,:claimLineProcedureCode,:claimReceivedDate, 
+							:claimServicingProviderId,:claimStatus,:clientId,:dischargeCode,:divisionId,:dxCode0,:dxCode1,:dxCode10,:dxCode11,:dxCode2,:dxCode3,:dxCode4,
+							:dxCode5,:dxCode6,:dxCode7,:dxCode8,:dxCode9,:dxCodeType0,:dxCodeType1,:dxCodeType10,:dxCodeType11,:dxCodeType2,:dxCodeType3,:dxCodeType4,
+							:dxCodeType5,:dxCodeType6,:dxCodeType7,:dxCodeType8,:dxCodeType9,:dxRelatedGroup,:healthPlanCode,:organizationId,
+							:placeOfService,:placeOfServiceDesc,:principalDx,:principalDxTypeCode,:principalProcedureCode,:principalProcedureCodeType,:procedureCode0,:procedureCode1,
+							:procedureCode10,:procedureCode11,:procedureCode2,:procedureCode3,:procedureCode4,:procedureCode5,:procedureCode6,:procedureCode7,:procedureCode8,
+							:procedureCode9,:procedureCodeType0,:procedureCodeType1,:procedureCodeType10,:procedureCodeType11,:procedureCodeType2,:procedureCodeType3,:procedureCodeType4,
+							:procedureCodeType5,:procedureCodeType6,:procedureCodeType7,:procedureCodeType8,:procedureCodeType9,:procedureOneCodeModifier1,:procedureOneCodeModifier2,
+							:procedureOneCodeModifier3,:procedureOneCodeModifier4,sysdate,:revenueCode,:serviceUnits,:servicingProviderId,sysdate,
+							sysdate,:subClientId,sysdate,:subscriberFirstName,:subscriberGender)" 
+				 />
 			</map>
 		</property>
 		<property name="sql" value="blank" />
@@ -176,13 +270,13 @@
 		<property name="fileType" value="#{jobParameters['fileType']}" />
 		<property name="sqlMap">
 			<map>
-				<entry key="claim"
-					value="update json_claim jc set jc.is_latest='false' where jc.json_doc.claimNumber=:claimNumber and jc.json_doc.baseKey=:baseKey" />
-				<entry key="member" value="update JSON_MEMBER set json_doc='' where id=-1 " />
-				<entry key="provider" value="update JSON_PROVIDER set json_doc='' where id=-1" />
+				<entry key="PJ_instclaims" value="update PJ_instclaims jc set jc.json_document.islatest='false' where jc.json_document.sourceIdentifier=:sourceIdentifier and jc.json_document.baseKey=:baseKey" />
+				<entry key="JSON_instclaims" value="update JSON_INSTCLAIMS jc set jc.islatest='false' where claimNumber=:claimNumber" />			
+				<entry key="HYB_instclaims" value="update HYB_INSTCLAIMS jc set jc.islatest='false' where claimNumber=:claimNumber" />	
+				<entry key="REL_instclaims" value="update REL_INSTCLAIMS jc set jc.&quot;isLatest&quot;='false' where &quot;claimNumber&quot;=:claimNumber" />			
 			</map>
 		</property>
-		<property name="sql" value="blank" />
+		<property name="sql" value="select sysdate from dual where 1=:one" />
 		<property name="itemSqlParameterSourceProvider">
 			<bean
 				class="org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider" />
@@ -194,13 +288,13 @@
 		<property name="fileType" value="#{jobParameters['fileType']}" />
 		<property name="sqlMap">
 			<map>
-				<entry key="claim"
-					value="update json_claim jc set jc.is_latest='true' where jc.json_doc.claimNumber=:claimNumber and jc.json_doc.baseKey=:baseKey and jc.json_doc.claimLineNumber=(select max(jc1.json_doc.claimLineNumber) from json_claim jc1 where jc1.json_doc.claimNumber=:claimNumber and jc1.json_doc.baseKey=:baseKey)" />
-				<entry key="member" value="update JSON_MEMBER set json_doc='' where id=-1" />
-				<entry key="provider" value="update JSON_PROVIDER set json_doc='' where id=-1" />
+				<entry key="PJ_instclaims" value="update PJ_instclaims jc set jc.json_document.islatest='true' where jc.json_document.sourceIdentifier=:sourceIdentifier and jc.json_document.baseKey=:baseKey and jc.json_document.claimLineNumber=(select max(jc1.json_document.claimLineNumber) from pj_instclaims jc1 where jc1.json_document.claimNumber=:claimNumber)" />
+				<entry key="JSON_instclaims" value="update json_instclaims jc set jc.islatest='true' where claimNumber=:claimNumber and claimLineNumber=(select max(jc1.claimLineNumber) from json_instclaims jc1 where jc1.claimNumber=:claimNumber)" />			
+				<entry key="HYB_instclaims" value="update hyb_instclaims jc set jc.islatest='true' where claimNumber=:claimNumber and claimLineNumber=(select max(jc1.claimLineNumber) from hyb_instclaims jc1 where jc1.claimNumber=:claimNumber)" />
+				<entry key="REL_instclaims" value="update rel_instclaims jc set jc.&quot;isLatest&quot;='true' where &quot;claimNumber&quot;=:claimNumber and &quot;claimLineNumber&quot;=(select max(jc1.claimLineNumber) from hyb_instclaims jc1 where jc1.claimNumber=:claimNumber)" />				
 			</map>
 		</property>
-		<property name="sql" value="blank" />
+		<property name="sql" value="select sysdate from dual where 1=:one" />
 		<property name="itemSqlParameterSourceProvider">
 			<bean
 				class="org.springframework.batch.item.database.BeanPropertyItemSqlParameterSourceProvider" />

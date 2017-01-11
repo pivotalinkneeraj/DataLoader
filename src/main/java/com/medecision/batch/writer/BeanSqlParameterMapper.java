@@ -23,7 +23,7 @@ public class BeanSqlParameterMapper extends BeanPropertyItemSqlParameterSourcePr
 
 		return new MapSqlParameterSource()
                 //.addValue("id", castedItem.get("_id"))
-                .addValue("json_doc", ((GenericData)item).getJson_doc());               
+                .addValue("json_doc", ((GenericData)item).getJsonDocumnet());               
     }
 	
 

@@ -12,7 +12,7 @@ public class ClaimProcessor implements ItemProcessor<Object, Object> {
 
 	@Override
 	public Object process(Object inboundItems) throws Exception {
-		@SuppressWarnings("unchecked")
+		//log.info("Casting item##:"+ inboundItems.toString());
 		GenericData genericData = new GenericData((String)inboundItems);
 		//List dataList = new LinkedList();
 		//dataList.add(genericData);
